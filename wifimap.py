@@ -70,6 +70,7 @@ def conectar_con_prim(df, mapa):
     for a, b in conexiones:
         folium.PolyLine([(a[0], a[1]), (b[0], b[1])], color="blue", weight=2, tooltip="Conexión WiFi (Prim)").add_to(mapa)
 
+# Obtener datos
 df = obtener_wifi(distrito)
 grafo = obtener_grafo(distrito, tipo_red)
 if df.empty:
@@ -152,4 +153,8 @@ if respuesta and respuesta.get("last_clicked"):
             attributes={'fill': 'orange', 'font-weight': 'bold', 'font-size': '16'}
         ).add_to(m)
         minutos = menor_dist / velocidad_mpm / 60
-        st.markdown(f"📏 Distancia: **{men
+        st.markdown(f"📏 Distancia: **{menor_dist:.1f} m**")
+        st.markdown(f"⏱️ Tiempo estimado: **{minutos:.1f} min**")
+        st_folium(m, width=800, height=600)
+    else:
+        st.error("No se encontró una ruta accesible al punto WiFi.")
