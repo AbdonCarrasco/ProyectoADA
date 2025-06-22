@@ -1,7 +1,11 @@
-osmnx[all]
-pandas
-folium
-geopy
 streamlit
 streamlit-folium
+folium
+pandas
+geopy
+osmnx
 networkx
+scipy
+rtree
+shapely
+pyproj
