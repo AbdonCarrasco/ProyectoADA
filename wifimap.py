@@ -75,12 +75,12 @@ def conectar_con_prim(df, mapa):
         visitados[v] = True
         conexiones.append((lugares[u], lugares[v]))
     for a, b in conexiones:
-        folium.PolyLine([(a[1], a[2]), (b[1], b[2])], color="blue", weight=2, tooltip="Conexión WiFi (Prim)").add_to(mapa)
+        folium.PolyLine([(a[1], a[2]), (b[1], b[2])],
+                        color="blue", weight=2, tooltip="Conexión WiFi (Prim)").add_to(mapa)
 
 # Cargar datos
 df = obtener_wifi(distrito)
 grafo = obtener_grafo(distrito, tipo_red)
-
 if df.empty:
     st.warning("No se encontraron puntos WiFi.")
     st.stop()
@@ -147,7 +147,8 @@ if respuesta and respuesta.get("last_clicked"):
             nodo_wifi = ox.distance.nearest_nodes(grafo, row["longitud"], row["latitud"])
             if nx.has_path(grafo, nodo_origen, nodo_wifi):
                 ruta = ox.shortest_path(grafo, nodo_origen, nodo_wifi, weight="length")
-                dist = sum(grafo.edges[u, v, 0].get("length", 0) for u, v in zip(ruta[:-1], ruta[1:]))
+                dist = sum(grafo.edges[u, v, 0].get("length", 0)
+                           for u, v in zip(ruta[:-1], ruta[1:]))
                 if dist < menor_dist:
                     mejor_ruta = ruta
                     menor_dist = dist
@@ -159,6 +160,7 @@ if respuesta and respuesta.get("last_clicked"):
 
     if mejor_ruta:
         coords = [(grafo.nodes[n]['y'], grafo.nodes[n]['x']) for n in mejor_ruta]
+
         st.markdown(f"📶 WiFi más accesible ({modo.lower()}): **{nombre_wifi}**")
 
         folium.PolyLine([(lat_user, lon_user), coords[0]], color="gray", weight=2,
@@ -167,4 +169,6 @@ if respuesta and respuesta.get("last_clicked"):
                         tooltip="Tramo final al WiFi").add_to(m)
 
         folium.PolyLine(coords, color="orange", weight=6, opacity=0.9,
-                        tooltip="Ruta sugerida", dash_array="10,5
+                        tooltip="Ruta sugerida", dash_array="10,5").add_to(m)
+
+        PolyLineTextPath(
