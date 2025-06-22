@@ -41,11 +41,9 @@ def obtener_wifi(distrito):
 
 @st.cache_data
 def obtener_grafo(distrito, tipo_red):
-    centro = ox.geocode(f"{distrito}, Lima, Peru")
-    grafo = ox.graph_from_point(centro, dist=2000, network_type=tipo_red)
-    if grafo.number_of_nodes() == 0:
-        return None
-    componente = nx.node_connected_component(grafo.to_undirected(), list(grafo.nodes())[0])
+    lugar = ox.geocode_to_gdf(f"{distrito}, Lima, Peru")
+    grafo = ox.graph_from_polygon(lugar.geometry.iloc[0], network_type=tipo_red)
+    componente = nx.node_connected_component(grafo.to_undirected(), list(grafo.nodes)[0])
     return grafo.subgraph(componente).copy()
 
 def conectar_con_prim(df, mapa):
@@ -66,8 +64,6 @@ def conectar_con_prim(df, mapa):
                         if dist < min_dist:
                             min_dist = dist
                             u, v = i, j
-        if v == -1:
-            break
         visitados[v] = True
         conexiones.append((lugares[u], lugares[v]))
     for a, b in conexiones:
@@ -78,7 +74,7 @@ df = obtener_wifi(distrito)
 grafo = obtener_grafo(distrito, tipo_red)
 
 if df.empty or grafo is None:
-    st.warning("No se pudieron obtener puntos WiFi o red vial conectada.")
+    st.warning("No se pudieron obtener puntos WiFi o red vial.")
     st.stop()
 
 df.drop_duplicates(subset=["latitud", "longitud"], inplace=True)
@@ -91,6 +87,7 @@ for _, row in df.iterrows():
         icon=folium.Icon(color="green")
     ).add_to(m)
 
+# Conectar puntos WiFi entre sí
 conectar_con_prim(df, m)
 
 st.markdown("### 🧭 Haz clic en el mapa para marcar tu ubicación")
@@ -101,28 +98,19 @@ if respuesta and respuesta.get("last_clicked"):
     lon_user = respuesta["last_clicked"]["lng"]
     st.success(f"📍 Ubicación registrada: ({lat_user:.6f}, {lon_user:.6f})")
 
-    try:
-        nodo_origen = ox.distance.nearest_nodes(grafo, lon_user, lat_user)
-    except Exception:
-        st.error("No se pudo encontrar un nodo cercano a tu ubicación.")
-        st.stop()
+    nodo_origen = ox.distance.nearest_nodes(grafo, lon_user, lat_user)
 
-    mejor_ruta = None
-    menor_dist = float("inf")
-    wifi_seleccionado = None
-
+    mejor_ruta, menor_dist, wifi_seleccionado = None, float("inf"), None
     for _, row in df.iterrows():
-        try:
-            nodo_wifi = ox.distance.nearest_nodes(grafo, row["longitud"], row["latitud"])
-            if nx.has_path(grafo, nodo_origen, nodo_wifi):
-                ruta = ox.shortest_path(grafo, nodo_origen, nodo_wifi, weight="length")
-                dist = sum(grafo.edges[u, v, 0].get("length", 0) for u, v in zip(ruta[:-1], ruta[1:]))
-                if dist < menor_dist:
-                    mejor_ruta = ruta
-                    menor_dist = dist
-                    wifi_seleccionado = row
-        except:
-            continue
+        lat_wifi, lon_wifi = row["latitud"], row["longitud"]
+        nodo_wifi = ox.distance.nearest_nodes(grafo, lon_wifi, lat_wifi)
+        if nx.has_path(grafo, nodo_origen, nodo_wifi):
+            ruta = ox.shortest_path(grafo, nodo_origen, nodo_wifi, weight="length")
+            dist = sum(grafo.edges[u, v, 0].get("length", 0) for u, v in zip(ruta[:-1], ruta[1:]))
+            if dist < menor_dist:
+                mejor_ruta = ruta
+                menor_dist = dist
+                wifi_seleccionado = row
 
     if mejor_ruta:
         coords = [(grafo.nodes[n]['y'], grafo.nodes[n]['x']) for n in mejor_ruta]
@@ -132,17 +120,19 @@ if respuesta and respuesta.get("last_clicked"):
 
         st.markdown(f"📶 WiFi más accesible ({modo.lower()}): **{nombre_wifi}**")
 
-        folium.Marker([lat_user, lon_user],
-                      tooltip="Tu ubicación",
-                      icon=folium.Icon(color="red", icon="user")).add_to(m)
+        folium.Marker(
+            [lat_user, lon_user],
+            tooltip="Tu ubicación",
+            icon=folium.Icon(color="red", icon="user")
+        ).add_to(m)
 
-        folium.PolyLine([(lat_user, lon_user), coords[0]],
-                        color="gray", weight=2, tooltip="Conexión al grafo").add_to(m)
-        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)],
-                        color="gray", weight=2, tooltip="Tramo final al WiFi").add_to(m)
+        folium.PolyLine([(lat_user, lon_user), coords[0]], color="gray", weight=2, tooltip="Conexión al grafo").add_to(m)
+        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)], color="gray", weight=2, tooltip="Tramo final al WiFi").add_to(m)
 
-        folium.PolyLine(coords, color="orange", weight=6, opacity=0.9,
-                        tooltip="Ruta sugerida", dash_array="10,5").add_to(m)
+        folium.PolyLine(
+            coords, color="orange", weight=6, opacity=0.9,
+            tooltip="Ruta sugerida", dash_array="10,5"
+        ).add_to(m)
 
         PolyLineTextPath(
             folium.PolyLine(coords),
