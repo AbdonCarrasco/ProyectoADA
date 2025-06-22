@@ -1,4 +1,4 @@
-osmnx
+osmnx[all]
 pandas
 folium
 geopy
