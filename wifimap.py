@@ -10,7 +10,7 @@ import networkx as nx
 st.set_page_config(page_title="Ruta al WiFi más cercano", layout="centered")
 st.title("🌐 Ruta óptima desde tu ubicación hasta el WiFi más cercano")
 
-# Selector
+# Selección de distrito y modo
 distritos = sorted([
     "Ate", "Barranco", "Breña", "Carabayllo", "Cercado de Lima", "Chorrillos",
     "Comas", "El Agustino", "Independencia", "Jesús María", "La Molina",
@@ -41,8 +41,8 @@ def obtener_wifi(distrito):
 
 @st.cache_data
 def obtener_grafo(distrito, tipo_red):
-    lugar = ox.geocode_to_gdf(f"{distrito}, Lima, Peru")
-    grafo = ox.graph_from_polygon(lugar.geometry.iloc[0], network_type=tipo_red)
+    centro = ox.geocode(f"{distrito}, Lima, Peru")
+    grafo = ox.graph_from_point(centro, dist=2000, network_type=tipo_red)
     if grafo.number_of_nodes() == 0:
         return None
     componente = nx.node_connected_component(grafo.to_undirected(), list(grafo.nodes())[0])
@@ -62,10 +62,7 @@ def conectar_con_prim(df, mapa):
             if visitados[i]:
                 for j in range(len(lugares)):
                     if not visitados[j]:
-                        dist = geodesic(
-                            (lugares[i][1], lugares[i][2]),
-                            (lugares[j][1], lugares[j][2])
-                        ).meters
+                        dist = geodesic((lugares[i][1], lugares[i][2]), (lugares[j][1], lugares[j][2])).meters
                         if dist < min_dist:
                             min_dist = dist
                             u, v = i, j
@@ -74,10 +71,7 @@ def conectar_con_prim(df, mapa):
         visitados[v] = True
         conexiones.append((lugares[u], lugares[v]))
     for a, b in conexiones:
-        folium.PolyLine(
-            [(a[1], a[2]), (b[1], b[2])],
-            color="blue", weight=2, tooltip="Conexión WiFi (Prim)"
-        ).add_to(mapa)
+        folium.PolyLine([(a[1], a[2]), (b[1], b[2])], color="blue", weight=2, tooltip="Conexión WiFi (Prim)").add_to(mapa)
 
 # Cargar datos
 df = obtener_wifi(distrito)
@@ -97,7 +91,6 @@ for _, row in df.iterrows():
         icon=folium.Icon(color="green")
     ).add_to(m)
 
-# Conectar WiFi con Prim
 conectar_con_prim(df, m)
 
 st.markdown("### 🧭 Haz clic en el mapa para marcar tu ubicación")
@@ -128,7 +121,7 @@ if respuesta and respuesta.get("last_clicked"):
                     mejor_ruta = ruta
                     menor_dist = dist
                     wifi_seleccionado = row
-        except Exception:
+        except:
             continue
 
     if mejor_ruta:
@@ -139,19 +132,17 @@ if respuesta and respuesta.get("last_clicked"):
 
         st.markdown(f"📶 WiFi más accesible ({modo.lower()}): **{nombre_wifi}**")
 
-        folium.Marker(
-            [lat_user, lon_user],
-            tooltip="Tu ubicación",
-            icon=folium.Icon(color="red", icon="user")
-        ).add_to(m)
+        folium.Marker([lat_user, lon_user],
+                      tooltip="Tu ubicación",
+                      icon=folium.Icon(color="red", icon="user")).add_to(m)
 
-        folium.PolyLine([(lat_user, lon_user), coords[0]], color="gray", weight=2, tooltip="Conexión al grafo").add_to(m)
-        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)], color="gray", weight=2, tooltip="Tramo final al WiFi").add_to(m)
+        folium.PolyLine([(lat_user, lon_user), coords[0]],
+                        color="gray", weight=2, tooltip="Conexión al grafo").add_to(m)
+        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)],
+                        color="gray", weight=2, tooltip="Tramo final al WiFi").add_to(m)
 
-        folium.PolyLine(
-            coords, color="orange", weight=6, opacity=0.9,
-            tooltip="Ruta sugerida", dash_array="10,5"
-        ).add_to(m)
+        folium.PolyLine(coords, color="orange", weight=6, opacity=0.9,
+                        tooltip="Ruta sugerida", dash_array="10,5").add_to(m)
 
         PolyLineTextPath(
             folium.PolyLine(coords),
@@ -163,7 +154,7 @@ if respuesta and respuesta.get("last_clicked"):
         st.markdown(f"📏 Distancia: **{menor_dist:.1f} metros**")
         st.markdown(f"⏱️ Tiempo estimado: **{minutos:.1f} minutos**")
     else:
-        st.warning("No se encontró una ruta conectada desde tu ubicación a ningún WiFi.")
+        st.warning("No se encontró una ruta conectada desde tu ubicación.")
 
     st_folium(m, width=800, height=600)
 else:
