@@ -26,7 +26,7 @@ modo = st.selectbox("Modo de transporte:", ["Peatonal", "Vehicular", "Avión"])
 tipo_mapa = st.radio("Vista del mapa:", ["Clásico", "Satélite"], horizontal=True)
 
 tipo_red = "walk" if modo == "Peatonal" else "drive" if modo == "Vehicular" else None
-velocidad_mpm = 75 if modo == "Peatonal" else 250 if modo == "Vehicular" else 833  # 50 km/h aprox
+velocidad_mpm = 75 if modo == "Peatonal" else 250 if modo == "Vehicular" else 833  # aprox 50km/h
 
 @st.cache_data
 def obtener_wifi(distrito):
@@ -90,11 +90,9 @@ tiles_map = "OpenStreetMap" if tipo_mapa == "Clásico" else "Esri.WorldImagery"
 m = folium.Map(location=[df.latitud.mean(), df.longitud.mean()], zoom_start=15, tiles=tiles_map)
 
 for _, row in df.iterrows():
-    folium.Marker(
-        [row.latitud, row.longitud],
-        popup=row.nombre_lugar or "WiFi público",
-        icon=folium.Icon(color="green")
-    ).add_to(m)
+    folium.Marker([row.latitud, row.longitud],
+                  popup=row.nombre_lugar or "WiFi público",
+                  icon=folium.Icon(color="green")).add_to(m)
 
 conectar_con_prim(df, m)
 
@@ -109,7 +107,6 @@ if respuesta and respuesta.get("last_clicked"):
     punto_usuario = (lat_user, lon_user)
     df["distancia"] = df.apply(lambda row: geodesic(punto_usuario, (row["latitud"], row["longitud"])).meters, axis=1)
     wifi_seleccionado = df.loc[df["distancia"].idxmin()]
-
     lat_wifi = wifi_seleccionado["latitud"]
     lon_wifi = wifi_seleccionado["longitud"]
     nombre_wifi = wifi_seleccionado["nombre_lugar"] or "WiFi público"
@@ -125,11 +122,9 @@ if respuesta and respuesta.get("last_clicked"):
         st.markdown(f"📏 Distancia: **{distancia:.1f} metros**")
         st.markdown(f"⏱️ Tiempo estimado: **{tiempo:.1f} minutos**")
 
-        folium.PolyLine(
-            [(lat_user, lon_user), (lat_wifi, lon_wifi)],
-            color="purple", weight=4, dash_array="5,5",
-            tooltip="Ruta directa (modo avión)"
-        ).add_to(m)
+        folium.PolyLine([(lat_user, lon_user), (lat_wifi, lon_wifi)],
+                        color="purple", weight=4, dash_array="5,5",
+                        tooltip="Ruta directa (modo avión)").add_to(m)
 
         st_folium(m, width=800, height=600)
         st.stop()
@@ -164,18 +159,12 @@ if respuesta and respuesta.get("last_clicked"):
 
     if mejor_ruta:
         coords = [(grafo.nodes[n]['y'], grafo.nodes[n]['x']) for n in mejor_ruta]
+        st.markdown(f"📶 WiFi más accesible ({modo.lower()}): **{nombre_wifi}**")
 
-        folium.PolyLine([(lat_user, lon_user), coords[0]], color="gray", weight=2, tooltip="Conexión al grafo").add_to(m)
-        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)], color="gray", weight=2, tooltip="Tramo final al WiFi").add_to(m)
+        folium.PolyLine([(lat_user, lon_user), coords[0]], color="gray", weight=2,
+                        tooltip="Conexión al grafo").add_to(m)
+        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)], color="gray", weight=2,
+                        tooltip="Tramo final al WiFi").add_to(m)
 
-        folium.PolyLine(
-            coords, color="orange", weight=6, opacity=0.9,
-            tooltip="Ruta sugerida", dash_array="10,5"
-        ).add_to(m)
-
-        PolyLineTextPath(
-            folium.PolyLine(coords),
-            '→', repeat=True, offset=7,
-            attributes={'fill': 'orange', 'font-weight': 'bold', 'font-size': '16'}
-        ).add_to(m)
-
+        folium.PolyLine(coords, color="orange", weight=6, opacity=0.9,
+                        tooltip="Ruta sugerida", dash_array="10,5
