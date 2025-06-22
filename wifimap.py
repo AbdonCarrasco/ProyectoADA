@@ -175,4 +175,7 @@ if respuesta and respuesta.get("last_clicked"):
 
         PolyLineTextPath(
             folium.PolyLine(coords),
-            '→
+            '→', repeat=True, offset=7,
+            attributes={'fill': 'orange', 'font-weight': 'bold', 'font-size': '16'}
+        ).add_to(m)
+
