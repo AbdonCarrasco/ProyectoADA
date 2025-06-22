@@ -160,8 +160,8 @@ if respuesta and respuesta.get("last_clicked"):
         coords = [(grafo.nodes[n]['y'], grafo.nodes[n]['x']) for n in mejor_ruta]
         st.markdown(f"📶 WiFi más accesible ({modo.lower()}): **{nombre_wifi}**")
 
-        folium.PolyLine([(lat_user, lon_user), coords[0]], color="gray", weight=2).add_to(m)
-        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)], color="gray", weight=2).add_to(m)
+        folium.PolyLine([(lat_user, lon_user), coords[0]], color="red", weight=2).add_to(m)
+        folium.PolyLine([coords[-1], (lat_wifi, lon_wifi)], color="red", weight=2).add_to(m)
         folium.PolyLine(coords, color="orange", weight=6, opacity=0.9,
                         tooltip="Ruta sugerida", dash_array="10,5").add_to(m)
 
