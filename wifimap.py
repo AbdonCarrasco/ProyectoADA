@@ -10,7 +10,7 @@ import networkx as nx
 st.set_page_config(page_title="Ruta al WiFi más cercano", layout="centered")
 st.title("🌐 Ruta óptima desde tu ubicación hasta el WiFi más cercano")
 
-# Selección de distrito y modo
+# Selector
 distritos = sorted([
     "Ate", "Barranco", "Breña", "Carabayllo", "Cercado de Lima", "Chorrillos",
     "Comas", "El Agustino", "Independencia", "Jesús María", "La Molina",
@@ -43,7 +43,9 @@ def obtener_wifi(distrito):
 def obtener_grafo(distrito, tipo_red):
     lugar = ox.geocode_to_gdf(f"{distrito}, Lima, Peru")
     grafo = ox.graph_from_polygon(lugar.geometry.iloc[0], network_type=tipo_red)
-    componente = nx.node_connected_component(grafo.to_undirected(), list(grafo.nodes)[0])
+    if grafo.number_of_nodes() == 0:
+        return None
+    componente = nx.node_connected_component(grafo.to_undirected(), list(grafo.nodes())[0])
     return grafo.subgraph(componente).copy()
 
 def conectar_con_prim(df, mapa):
@@ -60,21 +62,29 @@ def conectar_con_prim(df, mapa):
             if visitados[i]:
                 for j in range(len(lugares)):
                     if not visitados[j]:
-                        dist = geodesic((lugares[i][1], lugares[i][2]), (lugares[j][1], lugares[j][2])).meters
+                        dist = geodesic(
+                            (lugares[i][1], lugares[i][2]),
+                            (lugares[j][1], lugares[j][2])
+                        ).meters
                         if dist < min_dist:
                             min_dist = dist
                             u, v = i, j
+        if v == -1:
+            break
         visitados[v] = True
         conexiones.append((lugares[u], lugares[v]))
     for a, b in conexiones:
-        folium.PolyLine([(a[1], a[2]), (b[1], b[2])], color="blue", weight=2, tooltip="Conexión WiFi (Prim)").add_to(mapa)
+        folium.PolyLine(
+            [(a[1], a[2]), (b[1], b[2])],
+            color="blue", weight=2, tooltip="Conexión WiFi (Prim)"
+        ).add_to(mapa)
 
 # Cargar datos
 df = obtener_wifi(distrito)
 grafo = obtener_grafo(distrito, tipo_red)
 
 if df.empty or grafo is None:
-    st.warning("No se pudieron obtener puntos WiFi o red vial.")
+    st.warning("No se pudieron obtener puntos WiFi o red vial conectada.")
     st.stop()
 
 df.drop_duplicates(subset=["latitud", "longitud"], inplace=True)
@@ -87,7 +97,7 @@ for _, row in df.iterrows():
         icon=folium.Icon(color="green")
     ).add_to(m)
 
-# Conectar puntos WiFi entre sí
+# Conectar WiFi con Prim
 conectar_con_prim(df, m)
 
 st.markdown("### 🧭 Haz clic en el mapa para marcar tu ubicación")
@@ -98,19 +108,28 @@ if respuesta and respuesta.get("last_clicked"):
     lon_user = respuesta["last_clicked"]["lng"]
     st.success(f"📍 Ubicación registrada: ({lat_user:.6f}, {lon_user:.6f})")
 
-    nodo_origen = ox.distance.nearest_nodes(grafo, lon_user, lat_user)
+    try:
+        nodo_origen = ox.distance.nearest_nodes(grafo, lon_user, lat_user)
+    except Exception:
+        st.error("No se pudo encontrar un nodo cercano a tu ubicación.")
+        st.stop()
 
-    mejor_ruta, menor_dist, wifi_seleccionado = None, float("inf"), None
+    mejor_ruta = None
+    menor_dist = float("inf")
+    wifi_seleccionado = None
+
     for _, row in df.iterrows():
-        lat_wifi, lon_wifi = row["latitud"], row["longitud"]
-        nodo_wifi = ox.distance.nearest_nodes(grafo, lon_wifi, lat_wifi)
-        if nx.has_path(grafo, nodo_origen, nodo_wifi):
-            ruta = ox.shortest_path(grafo, nodo_origen, nodo_wifi, weight="length")
-            dist = sum(grafo.edges[u, v, 0].get("length", 0) for u, v in zip(ruta[:-1], ruta[1:]))
-            if dist < menor_dist:
-                mejor_ruta = ruta
-                menor_dist = dist
-                wifi_seleccionado = row
+        try:
+            nodo_wifi = ox.distance.nearest_nodes(grafo, row["longitud"], row["latitud"])
+            if nx.has_path(grafo, nodo_origen, nodo_wifi):
+                ruta = ox.shortest_path(grafo, nodo_origen, nodo_wifi, weight="length")
+                dist = sum(grafo.edges[u, v, 0].get("length", 0) for u, v in zip(ruta[:-1], ruta[1:]))
+                if dist < menor_dist:
+                    mejor_ruta = ruta
+                    menor_dist = dist
+                    wifi_seleccionado = row
+        except Exception:
+            continue
 
     if mejor_ruta:
         coords = [(grafo.nodes[n]['y'], grafo.nodes[n]['x']) for n in mejor_ruta]
@@ -144,7 +163,7 @@ if respuesta and respuesta.get("last_clicked"):
         st.markdown(f"📏 Distancia: **{menor_dist:.1f} metros**")
         st.markdown(f"⏱️ Tiempo estimado: **{minutos:.1f} minutos**")
     else:
-        st.warning("No se encontró una ruta conectada desde tu ubicación.")
+        st.warning("No se encontró una ruta conectada desde tu ubicación a ningún WiFi.")
 
     st_folium(m, width=800, height=600)
 else:
